@@ -550,6 +550,7 @@ export const Engine = class {
     const bestAttackers: any[] = [];
     const bestDefenders: any[] = [];
     const viableAttacker: any[] = [];
+    const groundNonRangedTanks: Unit[] = [];
 
     const N = 20;
     const unitMap = this.unitMap.get(serverName);
@@ -558,6 +559,11 @@ export const Engine = class {
     for (const candidate of unitMap.values()) {
       if (skipList.includes(candidate.name)) continue;
 
+      // Add ground non ranged for later
+      if (!candidate.a1_type.includes('ranged') && !candidate.abilities.includes('flying')) {
+        groundNonRangedTanks.push(candidate)
+      }
+
       const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N);
       let attackerLoss = 0;
       let defenderLoss = 0;
@@ -565,11 +571,12 @@ export const Engine = class {
         attackerLoss += r.attackerLoss,
         defenderLoss += r.defenderLoss
       }
+      // Set snipers
       bestAttackers.push({ name: candidate.name, value: defenderLoss/N, magic: candidate.magic });
-
-
-      // Dont' evaulate air units against ground unit that cannot reach
-      if (!unit.abilities.includes('ranged') && !unit.abilities.includes('flying')) {
+      
+      // Set defenders and favored head to head
+      if (!unit.a1_type.includes('ranged') && !unit.abilities.includes('flying')) {
+        // Units inside are ground and not ranged, like a Spirit Warrior
         if (!candidate.abilities.includes('flying')) {
           bestDefenders.push({ name: candidate.name, value: attackerLoss/N, magic: candidate.magic });
           
@@ -586,12 +593,87 @@ export const Engine = class {
       }
     }
 
+    // Prep the return data if the paired unit is a flying type
+    const suggestedTanks: any[] = []
+    if (unit.abilities.includes('flying')) {
+      const names: string[] = []
+      for (const r of groundNonRangedTanks) {
+        names.push(r.name)
+      }
+  
+      bestDefenders.sort((a, b) => a.value - b.value);
+      // TODO: Change to Discord bot output
+      console.log("finding the best ground, non ranged tanks")
+      for (let i = 0, a = 0; i < bestDefenders.length && a < 10; i++) {
+        // console.log(r)
+        if (names.includes(bestDefenders[i].name)){
+          a++
+          console.log("name: " + bestDefenders[i].name + " & value: " + bestDefenders[i].value)
+          suggestedTanks.push(bestDefenders[i])
+        }
+      }
+    }
+
     return {
       attackers: _.orderBy(bestAttackers, d => -d.value),
       defenders: _.orderBy(bestDefenders, d => d.value),
-      viables: _.orderBy(viableAttacker, d => -d.value)
+      viables: _.orderBy(viableAttacker, d => -d.value),
+      tanks: _.orderBy(suggestedTanks, d=> d.value)
     };
   }
+  
+    findTankSniperPairings(unit: Unit, serverName: string, attackerEnchants: any, defenderEnchants: any) {
+      
+      // 1: Group all of the ground, non ranged units
+      // 2: Run simulation to see which ones defend the best
+      // 3: List out the best tanks 
+      // 4: List out the best snipers
+      
+      
+      const skipList = ['Devil', 'Shadow Monster', 'Succubus'];
+  
+      const bestAttackers: any[] = [];
+      const bestDefenders: any[] = [];
+      const bestTankSniperCombo: any[] = [];
+  
+      const N = 20;
+      const unitMap = this.unitMap.get(serverName);
+      if (!unitMap) return
+  
+      for (const candidate of unitMap.values()) {
+        if (skipList.includes(candidate.name)) continue;
+  
+        const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N);
+        let attackerLoss = 0;
+        let defenderLoss = 0;
+        for (const r of results) {
+          attackerLoss += r.attackerLoss,
+          defenderLoss += r.defenderLoss
+        }
+        bestAttackers.push({ name: candidate.name, value: defenderLoss/N, magic: candidate.magic });
+  
+  
+        // Dont' evaulate air units against ground unit that cannot reach
+        if (!unit.abilities.includes('ranged') && !unit.abilities.includes('flying')) {
+
+          if (!candidate.abilities.includes('flying')) {
+            bestDefenders.push({ name: candidate.name, value: attackerLoss/N, magic: candidate.magic });
+            
+
+          }
+        } else {
+          bestDefenders.push({ name: candidate.name, value: attackerLoss/N, magic: candidate.magic });
+  
+
+        }
+      }
+  
+      return {
+        attackers: _.orderBy(bestAttackers, d => -d.value),
+        defenders: _.orderBy(bestDefenders, d => d.value),
+        viables: _.orderBy(bestTankSniperCombo, d => -d.value)
+      };
+    }
 
   resistanceReport(serverName: string, blackList: string[]) {
     const unitMap = this.unitMap.get(serverName) || new Map<string, Unit>();

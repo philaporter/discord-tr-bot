@@ -199,13 +199,13 @@ server = ${userPref.serverName}
     const topViableNether = _.take(r.viables.filter(d => d.magic === 'nether'), TOP);
     const topViablePhantasm = _.take(r.viables.filter(d => d.magic === 'phantasm'), TOP);
 
-
     const topDefenderAscendant = _.take(r.defenders.filter(d => d.magic === 'ascendant'), TOP);
     const topDefenderVerdant = _.take(r.defenders.filter(d => d.magic === 'verdant'), TOP);
     const topDefenderEradication = _.take(r.defenders.filter(d => d.magic === 'eradication'), TOP);
     const topDefenderNether = _.take(r.defenders.filter(d => d.magic === 'nether'), TOP);
     const topDefenderPhantasm = _.take(r.defenders.filter(d => d.magic === 'phantasm'), TOP);
 
+    const topTanks = _.take(r.tanks.filter(d => d.magic !== 'any'), 10);
 
     const T_attack = 2000000 * 0.15;
     const T_defend = 2000000 * 0.08;
@@ -260,7 +260,6 @@ Phantasm: ${topAttackerPhantasm.map(d => d.name).join(', ')}
 
 ^ Deals at least 15% damage (good snipers)
 
-
 #### Top defenders 
 Ascendant: ${topDefenderAscendant.map(d => d.name).join(', ')}
 Verdant: ${topDefenderVerdant.map(d => d.name).join(', ')}
@@ -270,7 +269,6 @@ Phantasm: ${topDefenderPhantasm.map(d => d.name).join(', ')}
 
 ^ Receives less than 8% damage (good tanks)
 
-
 #### Top head-to-head viable units:
 Ascendant: ${topViableAscendant.map(d => d.name).join(', ')}
 Verdant: ${topViableVerdant.map(d => d.name).join(', ')}
@@ -279,10 +277,29 @@ Nether: ${topViableNether.map(d => d.name).join(', ')}
 Phantasm: ${topViablePhantasm.map(d => d.name).join(', ')}
 
 ^ Deals 5% or more damage than it receives (good head-to-head)
+
+`;
+    // TODO: move somewhere better
+    for (let i = 0; i < topTanks.length; i++) {
+      if (topTanks[i].name.startsWith('^')) {
+        topTanks[i].name = topTanks[i].name.substring(1)
+      }
+    }
+
+    const appendReport = `
+#### Best ground, non ranged tanks for soaking fliers
+${topTanks.map(d => d.name).join(', ')}
+
+(2:1 setup. Tank the flier and follow with a flying or ranged sniper)
     `;
 
-    const header = `Pairing against ${u.name} - **${serverName}**`;
-    channel.send(header + "```" + 'md\n' + reportText + "```");
+    if (topTanks.length > 0) {
+      const header = `Pairing against ${u.name} - **${serverName}**`;
+      channel.send(header + "```" + 'md\n' + reportText + appendReport + "```");
+    } else {
+      const header = `Pairing against ${u.name} - **${serverName}**`;
+      channel.send(header + "```" + 'md\n' + reportText + "```");
+    }
     return;
   }
 
