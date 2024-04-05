@@ -6,6 +6,10 @@
   "bh": "bulwark horror",
   "wr": "wolf raider",
   "ur": "unholy reaver",
+  "da": "dark apprentice",
+  "or": "orc raider",
+  "oa": "orcish archer",
+  "ct": "cave troll",
 
   "rd": "red dragon",
   "chim": "chimera",
@@ -13,6 +17,12 @@
   "shaman": "dwarven shaman",
   "ds": "dwarven shaman",
   "sg": "storm giant",
+  "hh": "hell hound",
+  "dd": "dwarven deathseeker",
+  "de": "dwarven elite",
+  "dw": "dwarven warrior",
+  "fg": "fire giant",
+  "lm": "lizard man",
 
   "aa": "archangel",
   "dom": "dominion",
@@ -21,6 +31,9 @@
   "sw": "spirit warrior",
   "naga": "naga queen",
   "nq": "naga queen",
+  "ei": "empyrean inquisitor",
+  "am": "astral magician",
+  "ss": "soul speaker",
 
   "we": "water elemental",
   "ae": "air elemental",
@@ -28,9 +41,16 @@
   "mr": "mind ripper",
   "lev": "leviathan",
   "dj": "djinni",
+  "pw": "psychic wisp",
 
   "ee": "earth elemental",
   "he": "high elf",
   "nix": "phoenix",
-  "ebd": "elven blade dancer"
+  "ebd": "elven blade dancer",
+  "cv": "creeping vines",
+  "ea": "elvin archer",
+  "em": "elvin magician",
+  "fd": "faerie dragon",
+  "swan": "swanmay",
+  "tree": "treant"
 }
