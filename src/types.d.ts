@@ -15,6 +15,47 @@ export type ActionType = 'primary' | 'secondary' | 'counter';
 //   CLUMSINESS = 'clumsiness'
 // }
 
+export interface Skill {
+  name: string
+  level: number
+}
+
+export interface SkillDetails {
+  id: string
+  name: string
+  effects: Effects[]
+}
+
+export interface Effects {
+  target: string
+  action: {
+    attributes: string[]
+    type: string
+    value: {
+      1: number
+      2: number
+      3: number
+      4: number
+      5: number
+      6: number
+      7: number
+      8: number
+      9: number
+      10: number
+      11: number
+      12: number
+      13: number
+      14: number
+      15: number
+      16: number
+      17: number
+      18: number
+      19: number
+      20: number 
+    }
+  }
+}
+
 export interface Unit {
   name: string
   magic: Magic

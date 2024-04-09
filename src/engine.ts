@@ -3,8 +3,9 @@ import fs from 'fs';
 import { randomBM, levenshteinDistance } from './util';
 import { calcAccuracy } from './calc-accuracy';
 import { calcResistance } from './calc-resistance';
-import { calcDamageModifiers } from './calc-damage-modifiers';
-import { Unit, Ref, SimResult } from './types';
+import { calcDamageModifiers, calcSkillApModifiers } from './calc-damage-modifiers';
+import { calcHealthBoost } from './calc-health';
+import { Unit, Ref, SimResult, Skill, SkillDetails } from './types';
 
 // TODO
 // - Enchant: hallu
@@ -12,11 +13,13 @@ export const Engine = class {
   // class vars
   unitMap: Map<string, Map<string, Unit>>
   enchantmentMap: Map<string, Map<string, any>>
+  skillsMap: Map<string, Map<string, SkillDetails>>
   slangMap: Map<string, string>
 
   constructor() {
     this.unitMap = new Map();
     this.slangMap = new Map();
+    this.skillsMap = new Map();
     this.enchantmentMap = new Map();
   }
 
@@ -27,6 +30,7 @@ export const Engine = class {
    *   slangs.json
    *   /<server>
    *     enchantments.json
+   *     skills.json
    *     unit.json
    *   
    */
@@ -44,6 +48,7 @@ export const Engine = class {
     for (const server of serverListing) {
       const uMap: Map<string, Unit> = new Map();
       const eMap: Map<string, any> = new Map();
+      const sMap: Map<string, SkillDetails> = new Map();
 
       console.log('server', server.name);
       content = fs.readFileSync(`${dataPath}/${server.name}/units.json`, { encoding: 'utf-8' });
@@ -58,8 +63,21 @@ export const Engine = class {
         eMap.set(e.id, e);
       }
 
+      content = fs.readFileSync(`${dataPath}/${server.name}/skills.json`, { encoding: 'utf-8' });
+      const skills = JSON.parse(content);
+      for (const s of skills) {
+        sMap.set(s.id, s);
+      }
+
+      //temp
+      var keys = Object.keys(sMap);
+      keys.forEach(key =>{
+        console.log(key + '|' + sMap[key]);
+      });
+
       this.unitMap.set(server.name, uMap);
       this.enchantmentMap.set(server.name, eMap);
+      this.skillsMap.set(server.name, sMap);
     }
   }
 
@@ -138,6 +156,12 @@ export const Engine = class {
         }
       }
     });
+  }
+
+  // TODO: bring in the hp modification code
+  _calcHealthBoost(attackRef: Ref, defendRef: Ref, attackSkill: Skill[], defendSkill: Skill[], serverName: string) {
+    // TODO: Connect the skill maps to the user's skill information so it can be processed
+    calcHealthBoost(attackRef, defendRef, attackSkill, defendSkill, serverName, this.skillsMap);
   }
 
   _calcEnchantments(attackRef: Ref, defendRef: Ref, serverName: string, attackerEnchants: any, defenderEnchants: any) {
@@ -370,7 +394,8 @@ export const Engine = class {
 
 
   // Main method
-  simulate(attacker: Unit, defender: Unit, serverName: string, attackerEnchants: any , defenderEnchants: any) {
+  simulate(attacker: Unit, defender: Unit, serverName: string, attackerEnchants: any, 
+    defenderEnchants: any, attackSkill: Skill[], defendSkill: Skill[]) {
     // Allocate approximate number of units at equal net power
     const TOTAL_NP = 2000000;
 
@@ -418,6 +443,8 @@ export const Engine = class {
     }
 
     this._calcEnchantments(attackerRef, defenderRef, serverName, attackerEnchants, defenderEnchants);
+    calcSkillApModifiers(attackerRef, defenderRef, attackSkill, defendSkill, serverName, this.skillsMap);
+    this._calcHealthBoost(attackerRef, defenderRef, attackSkill, defendSkill, serverName);
 
     // temp
     let attackRef: Ref | null = null;
@@ -534,11 +561,11 @@ export const Engine = class {
   }
 
   // Run a series of simulations
-  simulateX(attacker: Unit, defender: Unit, serverName: string, attackerEnchants: any, defenderEnchants: any, n: number) {
+  simulateX(attacker: Unit, defender: Unit, serverName: string, attackerEnchants: any, defenderEnchants: any, n: number, attackerSkills: Skill[], defenderSkills: Skill[]) {
     const r: SimResult[] = [];
     for (let i = 0; i < n; i++) {
       r.push(
-        this.simulate(attacker, defender, serverName, attackerEnchants, defenderEnchants)
+        this.simulate(attacker, defender, serverName, attackerEnchants, defenderEnchants, attackerSkills, defenderSkills)
       );
     }
     return r;
@@ -563,8 +590,8 @@ export const Engine = class {
       if (!candidate.a1_type.includes('ranged') && !candidate.abilities.includes('flying')) {
         groundNonRangedTanks.push(candidate)
       }
-
-      const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N);
+      // TODO: FIX HARDCODED EMPTY ARRAY
+      const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N, [], []);
       let attackerLoss = 0;
       let defenderLoss = 0;
       for (const r of results) {
@@ -602,13 +629,9 @@ export const Engine = class {
       }
   
       bestDefenders.sort((a, b) => a.value - b.value);
-      // TODO: Change to Discord bot output
-      console.log("finding the best ground, non ranged tanks")
       for (let i = 0, a = 0; i < bestDefenders.length && a < 10; i++) {
-        // console.log(r)
         if (names.includes(bestDefenders[i].name)){
           a++
-          console.log("name: " + bestDefenders[i].name + " & value: " + bestDefenders[i].value)
           suggestedTanks.push(bestDefenders[i])
         }
       }
@@ -643,7 +666,8 @@ export const Engine = class {
       for (const candidate of unitMap.values()) {
         if (skipList.includes(candidate.name)) continue;
   
-        const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N);
+        // TODO: FIX HARDCODED ARRAYS
+        const results = this.simulateX(candidate, unit, serverName, attackerEnchants, defenderEnchants, N, [], []);
         let attackerLoss = 0;
         let defenderLoss = 0;
         for (const r of results) {
@@ -652,19 +676,13 @@ export const Engine = class {
         }
         bestAttackers.push({ name: candidate.name, value: defenderLoss/N, magic: candidate.magic });
   
-  
         // Dont' evaulate air units against ground unit that cannot reach
         if (!unit.abilities.includes('ranged') && !unit.abilities.includes('flying')) {
-
           if (!candidate.abilities.includes('flying')) {
             bestDefenders.push({ name: candidate.name, value: attackerLoss/N, magic: candidate.magic });
-            
-
           }
         } else {
           bestDefenders.push({ name: candidate.name, value: attackerLoss/N, magic: candidate.magic });
-  
-
         }
       }
   

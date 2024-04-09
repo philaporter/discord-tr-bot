@@ -5,7 +5,7 @@ dotenv.config()
 import _ from 'lodash';
 import { Client, Intents } from 'discord.js';
 import { Engine } from './engine';
-import { Unit } from './types';
+import { Unit, Skill } from './types';
 
 const engine = new Engine();
 engine.init('./data');
@@ -24,6 +24,9 @@ const DEFAULT_SERVER = 'blitz';
 
 // Allowed enchantments
 const allowedEnchantIds = ['bc', 'bs', 'ea', 'hallu', 'lnp', 'lore', 'pg', 'thl'];
+
+// Allowed skills
+const allowedSkillIds = ['lc', 'am', 'um'];
 
 let botId = '';
 // annel.send('```' + text + '```');
@@ -67,6 +70,8 @@ client.on('message', msg => {
     userPrefMap.set(username, {
       attackerEnchants: [],
       defenderEnchants: [],
+      attackerSkills: [],
+      defenderSkills: [],
       serverName: DEFAULT_SERVER
     });
   }
@@ -81,6 +86,9 @@ show config - Shows your configuration
 set enchant [<e1> <e2> vs <e1> <e2>] - Set enchantments
   default: set enchant default
   specify: set enchant none vs <enchant> <enchant>
+  clear all: set enchant
+set skill [<s1:lvl> <s2:lvl> vs <s1:lvl> <s2:lvl>] - Set skills
+  specify: set skill none vs <lc:20> <am:17>
   clear all: set enchant
 set server <server> - Select server, e.g. blitz, beta
 show match <unit1> vs <unit2> - Evaluate head-to-head match up
@@ -116,6 +124,56 @@ ${usageText}
     userPrefMap.get(username).serverName = server;
     const text = `Set server to ${server} for ${username}`;
     channel.send('```' + text + '```');
+    return;
+  }
+
+  if (content.startsWith('set skill')) {
+    const tokens = content.replace('set skill', '').split('vs');
+
+    userPrefMap.get(username).attackerSkills = [];
+    userPrefMap.get(username).defenderSkills = [];
+
+    // Clear skills
+    if (tokens.length !== 2) {
+      channel.send(`${username} cleared skills`); 
+      return;
+    }
+
+    // Set custom skills
+    const attackerSkills = tokens[0].split(/[\s,]/).filter(d => d != '');
+    const defenderSkills = tokens[1].split(/[\s,]/).filter(d => d != '');
+
+    // Filter out any skills that don't exist
+    const filteredAttackerSkills: string[] = attackerSkills
+    .filter(element => allowedSkillIds.includes(element.toLowerCase().substring(0,2)));
+    const filteredDefenderSkills: string[] = defenderSkills
+    .filter(element => allowedSkillIds.includes(element.toLowerCase().substring(0,2)));
+
+    for (let i = 0; i < filteredAttackerSkills.length; i++) {
+      let skill = filteredAttackerSkills[i].split(':');
+      // Check to make sure there is a level assigned
+      if (skill.length != 2) continue;
+      // Validate the numeric value of the level
+      let levelValue = parseInt(skill[1]);
+      if (levelValue < 1) continue;
+      if (levelValue > 20) levelValue = 20;
+      const skillInfo: Skill = {name: skill[0], level: levelValue};
+      userPrefMap.get(username).attackerSkills.push(skillInfo)
+    }
+
+    for (let i = 0; i < filteredDefenderSkills.length; i++) {
+      let skill = filteredDefenderSkills[i].split(':');
+      // Check to make sure there is a level assigned
+      if (skill.length != 2) continue;
+      // Validate the numeric value of the level
+      let levelValue = parseInt(skill[1]);
+      if (levelValue < 1) continue;
+      if (levelValue > 20) levelValue = 20;
+      const skillInfo: Skill = {name: skill[0], level: levelValue};
+      userPrefMap.get(username).defenderSkills.push(skillInfo)
+    }
+
+    channel.send(`${username}: attacker skills=${userPrefMap.get(username).attackerSkills.map(x => x.name + ":" + x.level).join(', ')} defender skills=${userPrefMap.get(username).defenderSkills.map(x => x.name + ":" + x.level).join(', ')}`);
     return;
   }
 
@@ -161,8 +219,9 @@ ${usageText}
 ### Configuration for ${username}
 attacker enchantments = ${userPref.attackerEnchants.join(', ')}
 defender enchantments = ${userPref.defenderEnchants.join(', ')}
-server = ${userPref.serverName}
-    `;
+attacker skills = ${userPref.attackerSkills.map(x => x.name + ":" + x.level).join(', ')}
+defender skills = ${userPref.defenderSkills.map(x => x.name + ":" + x.level).join(', ')}
+server = ${userPref.serverName}`;
     channel.send('```' + configText + '```');
     return;
   }
@@ -337,7 +396,11 @@ ${topTanks.map(d => d.name).join(', ')}
       const attackerEnchants = userPrefMap.get(username).attackerEnchants;
       const defenderEnchants = userPrefMap.get(username).defenderEnchants;
 
-      const r = engine.simulate(u1, u2, serverName, attackerEnchants, defenderEnchants);
+      // Add skills to simulation
+      const attackerSkills: Skill[] = userPrefMap.get(username).attackerSkills;
+      const defenderSkills: Skill[] = userPrefMap.get(username).defenderSkills;
+
+      const r = engine.simulate(u1, u2, serverName, attackerEnchants, defenderEnchants, attackerSkills, defenderSkills);
       const battleLog = r.battleLog;
 
       let attackercount = r.attackerUnitCount;
@@ -390,7 +453,11 @@ ${battleLog.join('\n')}
       const attackerEnchants = userPrefMap.get(username).attackerEnchants;
       const defenderEnchants = userPrefMap.get(username).defenderEnchants;
 
-      const results = engine.simulateX(u1, u2, serverName, attackerEnchants, defenderEnchants, N);
+      // Add skills to simulation
+      const attackerSkills: Skill[] = userPrefMap.get(username).attackerSkills;
+      const defenderSkills: Skill[] = userPrefMap.get(username).defenderSkills;
+
+      const results = engine.simulateX(u1, u2, serverName, attackerEnchants, defenderEnchants, N, attackerSkills, defenderSkills);
       let attackerloss = 0;
       let attackerunit = 0;
       let defenderloss = 0;
